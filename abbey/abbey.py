@@ -11,27 +11,32 @@ from . import config
 # - can create new data references
 # - never looks into the files itself? or maybe just metadata?
 
-class Abbey(object):
+class Valet(object):
     """
-    The master object, initialized with a directory containing all the information we need
-    to track.
-
-    Responsible only for initializing the other objects.
-
-    abbey.steward
-    abbet.valet
     """
     def __init__(self, config_path, mpi=False):
         self.config_path = config_path
         self.config = config.Config(config_path)
         self.steward = steward.Steward(self.config)
-        self.valet = valet.Valet(self)
-        # read configuration file in that path/abbey.cfg
-        #
-        # important configuration information:
-        # paths?
-        # anything?
-        # maybe just find abbey.sqlite3 there
+        pass
+
+    def print_dataset_list(self, **filters):
+        entries = self.steward.list_dataset_info(**filters)
+        for entry in entries:
+            print entry
+
+    def find_dataset(self, name, schema, version=None):
+        # returns a Dataset object corresponding to an existing file, checking that it matches
+        # the named schema
+        # If version==None just find the latest version.
+        pass
+
+    def create_dataset(self, name, schema, must_be_first):
+        # creates a new data set with the given schema and name.
+        # careful with parallelization here!
+        pass
+
+    def get_schema(self, schema_name):
         pass
 
     @property
@@ -42,7 +47,7 @@ class Abbey(object):
         return self.valet
 
     @classmethod
-    def create(self, repository_path):
+    def create_repository(self, repository_path):
         "Not used in user code: run once on a machine to create a new repo"
         # checks if directory exists and is not empty
         # creates abbey.cfg with defaults
