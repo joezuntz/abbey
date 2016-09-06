@@ -76,6 +76,10 @@ class Steward(object):
     def __init__(self, config):
         self.user = config.user
         self.path = config.path
+        if not os.path.exists(self.db_path):
+            raise ValueError("Repository not found at {} (missing repo.db)".format(self.path))
+        if not os.path.exists(self.data_path):
+            raise ValueError("Repository not found at {} (missing data dir)".format(self.path))
         engine_path = 'sqlite:///' + self.db_path
         self.engine = sqlalchemy.create_engine(engine_path, echo=config.db_echo)
         Base.metadata.create_all(self.engine)
@@ -108,9 +112,8 @@ class Steward(object):
         schema = entry.to_schema()
         return schema
 
-    def create_dataset(self, name, version, schema, size, metadata, creator=None):
-        if creator is None:
-            creator = self.user
+    def create_dataset(self, name, version, schema, size, metadata):
+        creator = self.user
 
         path = self.path_for_dataset(name, version)
         entry = DatasetEntry(name = name,
@@ -126,15 +129,24 @@ class Steward(object):
         dataset = Dataset(path, schema, "w", size, metadata, comm=None)
         return dataset
 
-    def open_dataset(self, info):
-        schema = self.get_schema(info.schema_name, info.schema_version)
+    def open_dataset(self, info, schema=None):
+        schema2 = self.get_schema(info.schema_name, info.schema_version)
+        if schema is not None:
+            if schema!=schema2:
+                raise ValueError("Schema {} of dataset {} does not match requested schema {}".format(
+                    schema2, nfo, schema))
+
         path = self.path_for_dataset(info.name, info.version)
         dataset = Dataset(path, schema, "r")
         return dataset
 
 
-    def get_dataset_info(self, name, version):
-        entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
+    def get_dataset_info(self, name, version=None):
+        if version is None:
+            entry = self.db.query(DatasetEntry).filter_by(name=name).order_by(
+                sqlalchemy.desc(DatasetEntry.version)).first()
+        else:
+            entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
         return entry
 
     def list_dataset_info(self, name=None, version=None, schema=None, schema_name=None, schema_version=None,creator=None):
