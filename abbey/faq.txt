@@ -1,0 +1,13 @@
+F.A.Q.
+
+
+Why can't we use FITS?
+----------------------
+FITS is good for images but bad for catalogs.
+HDF5 is faster for typical catalog access patterns and far more flexible.
+
+
+I really want to save my file in FITS format.
+---------------------------------------------
+That isn't a question and I don't care, you can't.
+

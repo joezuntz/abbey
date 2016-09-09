@@ -5,6 +5,7 @@ config_format = {
     "user": str,
     "path": str,
     "db_echo": bool,
+    "server": str,
 }
 
 
@@ -23,3 +24,8 @@ class Config(object):
                 raise ValueError("Configuration entry '{}' has wrong type: {} instead of {}.".format(
                     entry, type(value), config_format[entry]))
             setattr(self, entry, value)
+        for entry in config_format:
+            if not hasattr(self, entry):
+                raise ValueError("Could not find setting {} in configuration file".format(entry))
+
+

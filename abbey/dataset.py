@@ -56,11 +56,40 @@ class Dataset(object):
         schema.create_structure(f, size, metadata)
         return f
 
+    def resize(self, size, section_name=None):
+        section = self.find_section(section_name)
+        for col in section.values():
+            col.resize(size)
+
+    def add_columns(self, names, dtypes, section_name=None, size=None):
+        try:
+            section = self.find_section(section_name)
+        except KeyError:
+            if section_name is None:
+                raise ValueError("Must specify section_name and size to create completely new sections")
+            self.file.create_group(section_name)
+        existing_keys = section.keys()
+        if existing_keys:
+            size = existing_keys[0].size
+        else:
+            if size is None:
+                raise ValueError("Must specify a size to create a new section.")
+
+        for name,dtype in zip(names,dtypes):
+            if name not in existing_keys:
+                section.create_dataset(name, shape=(size,), dtype=dtype)
+
+    def keys(self, section_name=None):
+        section = self.find_section(section_name)
+        return section.keys()
+
     def find_section(self, section_name):
         if section_name is None:
             keys = self.file.keys()
             if len(keys)==1:
                 section_name = keys[0]
+            elif len(keys)==0:
+                raise KeyError("No sections in this file yet.")
             else:
                 raise RuntimeError("Multiple section names in data file - please set section_name= one of : {}".format(', '.join(keys)))
         section = self.file[section_name]

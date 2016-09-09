@@ -25,6 +25,9 @@ class Schema(object):
     def __eq__(self, other):
         return (self.name==other.name) and (self.version==other.version)
 
+    def __ne__(self, other):
+        return not self==other
+
     def __repr__(self):
         return '<Schema "{}" v{}>'.format(self.name,self.version)
 
@@ -67,10 +70,10 @@ class Schema(object):
             try:
                 val = group[name]
             except KeyError:
-                raise ValidationError("Item {} not found in file".format(name))
+                raise ValidationError("Required Item '{}' not found.".format(name))
             val_dtype = np.array(val).dtype
             if val_dtype != dtype:
-                raise ValidationError("Item {} has wrong type: {} instead of {}".format(name, val_dtype, dtype))
+                raise ValidationError("Required Item '{}' has wrong type: {} instead of {}".format(name, val_dtype, dtype))
 
     def create_structure(self, f, size, metadata):
         # add metadata
@@ -83,7 +86,7 @@ class Schema(object):
         # add columns
         sections = set()
         for (section, name, dtype) in self.columns:
-            f.create_dataset("{}/{}".format(section,name), shape=(size,), dtype=dtype)
+            f.create_dataset("{}/{}".format(section,name), shape=(size,), maxshape=(None,), dtype=dtype, chunks=True)
         
 
 

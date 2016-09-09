@@ -46,7 +46,7 @@ class SchemaEntry(Base):
 
     @classmethod
     def from_schema(cls, schema):
-        #some paranoid cheching
+        #some paranoid checking
         assert isinstance(schema.columns, list)
         for col in schema.columns:
             assert isinstance(col, tuple)
@@ -66,14 +66,13 @@ class SchemaEntry(Base):
 
 
 
-
 class Steward(object):
     """
     A register of data sets and schema. Synchronized with disk.
     Should be version controllable in some way.
 
     """
-    def __init__(self, config):
+    def __init__(self, config, mpi_comm=None):
         self.user = config.user
         self.path = config.path
         if not os.path.exists(self.db_path):
@@ -86,6 +85,17 @@ class Steward(object):
         Session = sqlalchemy.orm.sessionmaker()
         Session.configure(bind=self.engine)
         self.db = Session()
+        self.mpi_comm = mpi_comm
+        if self.mpi_comm is None:
+            self.mpi_rank = 0
+            self.mpi_size = 1
+        else:
+            self.mpi_rank = mpi_comm.Get_rank()
+            self.mpi_size = mpi_comm.Get_size()
+
+    @property
+    def is_master(self):
+        return self.mpi_rank==0
 
     def path_for_dataset(self, name, version):
         return os.path.join(self.data_path, "{}_{}.h5".format(name, version))
@@ -99,6 +109,8 @@ class Steward(object):
         return os.path.join(self.path, "repo.db")
 
     def register_schema(self, schema):
+        if not self.is_master:
+            return
         entry = SchemaEntry.from_schema(schema)
         self.db.add(entry)
         self.db.commit()
@@ -112,29 +124,61 @@ class Steward(object):
         schema = entry.to_schema()
         return schema
 
-    def create_dataset(self, name, version, schema, size, metadata):
-        creator = self.user
-
-        path = self.path_for_dataset(name, version)
-        entry = DatasetEntry(name = name,
+    def create_schema(self, name, version, columns, required_metadata):
+        if not self.is_master:
+            return
+        entry = SchemaEntry(name = name,
             version = version,
-            schema_name = schema.name,
-            schema_version = schema.version,
-            creator = creator,
-            path = path
-        )
+            columns = columns,
+            required_metadata = required_metadata
+            )
         self.db.add(entry)
         self.db.commit()
-        print "comm = None, do not forget"
-        dataset = Dataset(path, schema, "w", size, metadata, comm=None)
+
+
+    def create_dataset(self, name, version, schema, size, metadata):
+        creator = self.user
+        path = self.path_for_dataset(name, version)
+        dataset = Dataset(path, schema, "w", size, metadata, comm=self.mpi_comm)
+        #Only register the dataset after creating it in case something goes wrong.
+        if self.is_master:
+            entry = DatasetEntry(name = name,
+                version = version,
+                schema_name = schema.name,
+                schema_version = schema.version,
+                creator = creator,
+                path = path
+            )
+            self.db.add(entry)
+            self.db.commit()
         return dataset
+
+    def delete_schema(self, name, version):
+        entry = self.db.query(SchemaEntry).filter_by(name=name, version=version).first()
+        if entry is None:
+            raise ValueError("Schema you want to delete ({} v{}) not found.  Maybe that is good.".format(name,version))
+        self.db.delete(entry)
+        self.db.commit()
+
+    def delete_dataset(self, name, version):
+        path = self.path_for_dataset(name, version)
+        if os.path.exists(path):
+            os.remove(path)
+        entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
+        if entry is None:
+            raise ValueError("Dataset you want to delete ({} v{}) not found.  Maybe that is good.".format(name,version))
+        self.db.delete(entry)
+        self.db.commit()
+
+
 
     def open_dataset(self, info, schema=None):
         schema2 = self.get_schema(info.schema_name, info.schema_version)
         if schema is not None:
             if schema!=schema2:
+                print schema==schema2
                 raise ValueError("Schema {} of dataset {} does not match requested schema {}".format(
-                    schema2, nfo, schema))
+                    schema2, info, schema))
 
         path = self.path_for_dataset(info.name, info.version)
         dataset = Dataset(path, schema, "r")
@@ -165,6 +209,14 @@ class Steward(object):
             entries = entries.filter_by(creator=creator)
         if schema is not None:
             entries = entries.filter_by(schema_name=schema.name, schema_version=schema.version)
+        return list(entries)
+
+    def list_schema_info(self, name=None, version=None):
+        entries = self.db.query(SchemaEntry)
+        if name is not None:
+            entries = entries.filter_by(name=name)
+        if version is not None:
+            entries = entries.filter_by(version=version)
         return list(entries)
 
 
