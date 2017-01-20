@@ -1,4 +1,3 @@
-from . import sql
 import collections
 import numpy as np
 

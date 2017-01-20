@@ -2,7 +2,7 @@ import abbey
 import numpy as np
 
 
-def create_test_schema(steward):
+def create_test_schema(valet):
     cols = [
         ("shape_cat", "coadd_object_id", "int64"),
         ("shape_cat", "e1", "float64"),
@@ -16,9 +16,8 @@ def create_test_schema(steward):
         ("cake", "float64"),
     ]
 
-    schema = abbey.Schema("test_schema", 1, cols, required_metadata)
-    steward.register_schema(schema)
-    return schema
+    schema = valet.create_schema("test_schema", 1, cols, required_metadata)
+    return valet.get_schema("test_schema", 1)
 
 def create_dataset(valet, schema):
     size = 100
@@ -34,15 +33,15 @@ def create_dataset(valet, schema):
     dataset.write(chunk, section_name="shape_cat")
     return dataset
 
-
-valet = abbey.Valet("./config.yml")
+config = abbey.Config("./config.yml")
+# abbey.Valet.create_repository(config)
+valet = abbey.Valet(config)
 # valet.print_dataset_list()
 # create_test_schema(valet)
 schema = valet.get_schema("test_schema")
-# print schema
+print schema
 dataset = create_dataset(valet, schema)
 dataset.resize((300,), "shape_cat")
-
 # dataset = valet.open_dataset("not_real", schema, 1)
 # dataset = valet.open_dataset("temp", schema)
 
@@ -60,3 +59,4 @@ dataset.resize((300,), "shape_cat")
 # dataset = abbey.Dataset("./tmp.h5", schema, "r")
 # data = dataset.read("shape_cat", range=(0,20))
 # print data
+

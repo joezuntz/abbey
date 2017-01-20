@@ -38,7 +38,7 @@ class Valet(object):
 
     def open_dataset(self, name, schema, version=None):
         """
-        Open a dataset with the 
+        Open a dataset with the specified name and schema
         """
         info = self.steward.get_dataset_info(name,version)
         if info is None:
