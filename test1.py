@@ -32,7 +32,8 @@ parser.add_argument("--list",    action='store_true', help="List data sets")
 parser.add_argument("--mpi",    action='store_true', help="Run under MPI")
 args = parser.parse_args()
 
-config = abbey.Config("./config.yml")
+config = "./config.yml"
+
 if args.mpi:
     import mpi4py.MPI
     comm = mpi4py.MPI.COMM_WORLD
