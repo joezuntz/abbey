@@ -1,6 +1,5 @@
 from .schema import Schema
 from .dataset import Dataset
-import sqlite3
 import os
 import collections
 import sqlalchemy
