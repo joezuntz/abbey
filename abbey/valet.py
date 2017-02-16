@@ -1,7 +1,6 @@
 import os
 from . import steward
 from . import config
-from sqlalchemy.exc import IntegrityError
 
 class Valet(object):
     """
@@ -52,7 +51,7 @@ class Valet(object):
     def create_dataset(self, name, version, schema, size, metadata):
         try:
             return self.steward.create_dataset(name, version, schema, size, metadata)
-        except IntegrityError:
+        except ValueError:
             raise ValueError('There is already a dataset "{}" version {}'.format(name, version))
 
     def get_schema(self, schema_name, schema_version=None):
