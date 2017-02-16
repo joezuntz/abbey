@@ -39,6 +39,12 @@ class Dataset(object):
     def __repr__(self):
         return '<Dataset of type "{}" v{} mode "{}">'.format(self.schema.name, self.schema.version, self.mode, self.path)
     
+    def has_column(self, name, section_name=None):
+        try:
+            section = self.find_section(section_name)
+        except KeyError:
+            return False
+        return name in section
 
     def validate_against_schema(self, path, schema):
         import h5py
