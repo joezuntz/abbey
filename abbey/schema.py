@@ -54,7 +54,7 @@ class Schema(object):
 
             #Also validate type
 
-    def create_structure(self, dataset, size):
+    def create_structure(self, dataset, size, metadata):
         # add metadata
         for key, value in metadata.items():
             dataset.metadata[key] = value

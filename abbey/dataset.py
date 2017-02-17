@@ -1,5 +1,4 @@
 import os
-from astropy.table import Table
 
 
 
@@ -32,14 +31,11 @@ class Dataset(object):
         if mode == "r":
             self.file = h5py.File(path, mode="r", **self.driver_args)
             self.metadata = self.file['metadata'].attrs
-            print self.metadata
             schema.validate_dataset(self)
         elif mode == "w":
             if size is None or metadata is None:
                 raise RuntimeError("Must specify metadata to create new dataset")
-            self.file = self.create_with_schema(path, schema, size, metadata)
-            self.metadata = self.file['metadata'].attrs
-            print self.metadata
+            self.create_with_schema(path, schema, size, metadata)
         else:
             raise ValueError("Unknown dataset mode {}".format(mode))
 
@@ -67,10 +63,12 @@ class Dataset(object):
         if os.path.exists(path):
             raise ValueError("File opened for reading already exists: {}".format(path))
         schema.validate_metadata(metadata)
-        
-        f = h5py.File(path, mode="w", **self.driver_args)
-        schema.create_structure(f, size, metadata)
-        return f
+        self.file = h5py.File(path, mode="w", **self.driver_args)
+        self.file.create_group("metadata")
+        self.metadata = self.file['metadata'].attrs
+
+        schema.create_structure(self, size, metadata)
+
 
     def resize(self, size, section_name=None):
         section = self.find_section(section_name)
@@ -84,6 +82,7 @@ class Dataset(object):
             if section_name is None:
                 raise ValueError("Must specify section_name and size to create completely new sections")
             self.file.create_group(section_name)
+            section = self.find_section(section_name)
         existing_keys = section.keys()
         if existing_keys:
             size = existing_keys[0].size
@@ -111,9 +110,15 @@ class Dataset(object):
         section = self.file[section_name]
         return section
 
-    def read(self, section_name=None, range=None, columns=None):
+    def read(self, section_name=None, range=None, columns=None, table_maker=None):
         if self.mode != "r":
             raise RuntimeError("Tried to read data from a file opened in mode: {}".format(self.mode))
+
+        if table_maker is None:
+            import astropy.table
+            table_maker = astropy.table.Table
+
+
 
         section = self.find_section(section_name)
         # Data files can have a number of sections.  
@@ -130,7 +135,7 @@ class Dataset(object):
             start,end = range
             data = [section[column][start:end] for column in columns]
 
-        table = Table(names=columns, data=data)
+        table = table_maker(names=columns, data=data)
         return table
 
 
