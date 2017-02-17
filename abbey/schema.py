@@ -32,61 +32,40 @@ class Schema(object):
 
     def validate_dataset(self, dataset):
         self._validate_data(dataset)
-        self._validate_dataset_metadata(dataset)
-
-    def _validate_dataset_metadata(self, dataset):
-        try:
-            metadata = dataset['metadata'].attrs
-        except KeyError:
-            raise ValidationError("Metadata section not found in file")
-
-        #Validate the name and version of the schema.
-        self._validate_value(metadata, "schema_name", self.name)
-        self._validate_value(metadata, "schema_version", self.version)
-
-        #Validate the user metadata
-        self.validate_metadata(metadata)
+        self.validate_metadata(dataset.metadata)
 
     def validate_metadata(self, metadata):
-        self._validate_group(metadata, self.required_metadata)
+        for name,dtype in self.required_metadata:
+            if name not in metadata:
+                raise ValidationError("Missing metadata: {}".format(name))
+            value = np.array(metadata[name])
+            dt = value.dtype
+            if not dt==dtype:
+                raise ValidationError("Metadata: {} has wrong type ({} not {})".format(name, dt, dtype))
 
     def _validate_data(self, dataset):
         #Validate the data columns themselves
-        cols = [("{}/{}".format(c[0],c[1]), c[2]) for c in self.columns]
-        self._validate_group(dataset, cols)
-
-    def _validate_value(self, metadata, metadata_name, desired_value):
-        try:
-            found_value = metadata[metadata_name]
-            assert found_value == desired_value
-        except KeyError:
-            raise ValidationError("{} not found in file metadata".format(metadata_name))
-        except AssertionError:
-            raise ValidationError("{} wrong in file metadata: {} not {}".format(metadata_name, found_value, desired_value))
-
-    def _validate_group(self, group, required):
-        for name,dtype in required:
-            try:
-                val = group[name]
-            except KeyError:
-                raise ValidationError("Required Item '{}' not found.".format(name))
-            val_dtype = np.array(val).dtype
-            if val_dtype != dtype:
-                raise ValidationError("Required Item '{}' has wrong type: {} instead of {}".format(name, val_dtype, dtype))
-
-    def create_structure(self, f, size, metadata):
-        # add metadata
-        g = f.create_group("/metadata")
-        for key, value in metadata.items():
-            g.attrs[key] = value
-        g.attrs['schema_name'] = self.name
-        g.attrs['schema_version'] = self.version
-
-        # add columns
-        sections = set()
         for (section, name, dtype) in self.columns:
-            f.create_dataset("{}/{}".format(section,name), shape=(size,), maxshape=(None,), dtype=dtype, chunks=True)
-        
+            if not dataset.has_column(name, section):
+                raise ValidationError("Missing column: {} in section {}".format(name,section))
+            actual_dtype = dataset.column_type(name,section)
+            if not dtype == actual_dtype:
+                raise ValidationError("olumn: {} in section {} has wrong type ({} not {})".format(name,section,actual_dtype,dtype))
 
+            #Also validate type
 
+    def create_structure(self, dataset, size):
+        # add metadata
+        for key, value in metadata.items():
+            dataset.metadata[key] = value
+        dataset.metadata['schema_name'] = self.name
+        dataset.metadata['schema_version'] = self.version
 
+        cols_by_section = collections.defaultdict(list)
+        for (section, name, dtype) in self.columns:
+            cols_by_section[section].append((name,dtype))
+
+        for section_name, cols in cols_by_section.items():
+            names = [col[0] for col in cols]
+            dtypes =[col[1] for col in cols]
+            dataset.add_columns(names, dtypes, section_name, size)

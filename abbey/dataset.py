@@ -17,6 +17,7 @@ class Dataset(object):
     """
     def __init__(self, path, schema, mode, size=None, metadata=None, comm=None):
         "Size can be a dictionary if there is more than one section in the schema"
+        import h5py
         if comm is None:
             self.driver_args = {}
             self.parallel = False
@@ -24,17 +25,23 @@ class Dataset(object):
             self.driver_args = {"comm":comm, "driver":"mpio"}
             self.parallel = True
 
+        self.mode = mode
+        self.path=path
+        self.schema=schema
+
         if mode == "r":
-            self.file = self.validate_against_schema(path, schema)
+            self.file = h5py.File(path, mode="r", **self.driver_args)
+            self.metadata = self.file['metadata'].attrs
+            print self.metadata
+            schema.validate_dataset(self)
         elif mode == "w":
             if size is None or metadata is None:
                 raise RuntimeError("Must specify metadata to create new dataset")
             self.file = self.create_with_schema(path, schema, size, metadata)
+            self.metadata = self.file['metadata'].attrs
+            print self.metadata
         else:
             raise ValueError("Unknown dataset mode {}".format(mode))
-        self.mode = mode
-        self.path=path
-        self.schema=schema
 
     def __repr__(self):
         return '<Dataset of type "{}" v{} mode "{}">'.format(self.schema.name, self.schema.version, self.mode, self.path)
@@ -46,11 +53,14 @@ class Dataset(object):
             return False
         return name in section
 
-    def validate_against_schema(self, path, schema):
-        import h5py
-        f = h5py.File(path, mode="r", **self.driver_args)
-        schema.validate_dataset(f)
-        return f
+    def column_type(self, name, section_name):
+        try:
+            section = self.find_section(section_name)
+        except KeyError:
+            return False
+        col = section[name]
+        return col.dtype
+
 
     def create_with_schema(self, path, schema, size, metadata):
         import h5py
@@ -83,7 +93,7 @@ class Dataset(object):
 
         for name,dtype in zip(names,dtypes):
             if name not in existing_keys:
-                section.create_dataset(name, shape=(size,), dtype=dtype)
+                section.create_dataset(name, shape=(size,), dtype=dtype, chunks=True, maxshape=(None,))
 
     def keys(self, section_name=None):
         section = self.find_section(section_name)
