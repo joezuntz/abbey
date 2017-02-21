@@ -8,40 +8,41 @@ import sqlalchemy.orm
 
 Base = sqlalchemy.ext.declarative.declarative_base()
 
-
-class ListEntry(sqlalchemy.types.TypeDecorator):
-    impl = sqlalchemy.types.Text
-    def process_bind_param(self, value, dialect):
-        return repr(value)
-    def process_result_value(self, value, dialect):
-        return eval(value)
-
 class DatasetEntry(Base):
     __tablename__ = "datasets"
-    name = sqlalchemy.Column(sqlalchemy.String, primary_key=True)
-    version = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    schema_name = sqlalchemy.Column(sqlalchemy.String)
-    schema_version = sqlalchemy.Column(sqlalchemy.Integer)
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    name = sqlalchemy.Column(sqlalchemy.String)
+    version = sqlalchemy.Column(sqlalchemy.Integer)
+    unique_name_version = sqlalchemy.UniqueConstraint('name', 'version', name='unv_1')
     creator = sqlalchemy.Column(sqlalchemy.String)
     path = sqlalchemy.Column(sqlalchemy.String)
+
+    schema_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("schemas.id"))
+    schema = sqlalchemy.orm.relationship("SchemaEntry", back_populates="datasets")
+
 
     def __repr__(self):
         return '<Dataset Info "{}" v{}>'.format(self.name,self.version)
 
 
-
 class SchemaEntry(Base):
     __tablename__ = "schemas"
-    name = sqlalchemy.Column(sqlalchemy.String, primary_key=True)
-    version = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-    columns = sqlalchemy.Column(ListEntry)
-    required_metadata = sqlalchemy.Column(ListEntry)
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    name = sqlalchemy.Column(sqlalchemy.String)
+    version = sqlalchemy.Column(sqlalchemy.Integer)
+    unique_name_version = sqlalchemy.UniqueConstraint('name', 'version', name='unv_2')
+
+    columns = sqlalchemy.orm.relationship("SchemaColumn")
+    required_metadata = sqlalchemy.orm.relationship("SchemaMetaData")
+    datasets = sqlalchemy.orm.relationship("DatasetEntry")
 
     def __repr__(self):
         return '<Schema Info "{}" v{}>'.format(self.name,self.version)
 
     def to_schema(self):
-        return Schema(self.name, self.version, self.columns, self.required_metadata)
+        columns = [col.to_column() for col in self.columns]
+        required_metadata = [md.to_metadata() for md in self.required_metadata]
+        return Schema(self.name, self.version, columns, required_metadata)
 
     @classmethod
     def from_schema(cls, schema):
@@ -63,6 +64,26 @@ class SchemaEntry(Base):
 
         return cls(name=schema.name, version=schema.version, columns=schema.columns, required_metadata=schema.required_metadata)
 
+class SchemaColumn(Base):
+    __tablename__ = "schema_columns"
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    section = sqlalchemy.Column(sqlalchemy.String)
+    name = sqlalchemy.Column(sqlalchemy.String)
+    datatype = sqlalchemy.Column(sqlalchemy.String)
+    schema_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey('schemas.id'))
+
+    def to_column(self):
+        return (self.section, self.name, self.datatype)
+
+class SchemaMetaData(Base):
+    __tablename__ = "schema_metadata"
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    name = sqlalchemy.Column(sqlalchemy.String)
+    datatype = sqlalchemy.Column(sqlalchemy.String)
+    schema_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey('schemas.id'))
+
+    def to_metadata(self):
+        return (self.name, self.datatype)
 
 
 class Steward(object):
@@ -114,23 +135,39 @@ class Steward(object):
         self.db.add(entry)
         self.db.commit()
 
-    def get_schema(self, name, version=None):
+    def get_schema_info(self, name, version=None):
         if version is None:
             entry = self.db.query(SchemaEntry).filter_by(name=name).order_by(
                 sqlalchemy.desc(SchemaEntry.version)).first()
         else:
             entry = self.db.query(SchemaEntry).filter_by(name=name, version=version).first()
-        schema = entry.to_schema()
+        return entry
+
+    def get_schema(self, name, version=None):
+        schema_info = self.get_schema_info(name,version)
+        schema = schema_info.to_schema()
         return schema
 
     def create_schema(self, name, version, columns, required_metadata):
         if not self.is_master:
             return
-        entry = SchemaEntry(name = name,
+
+        entry = SchemaEntry(
+            name = name,
             version = version,
-            columns = columns,
-            required_metadata = required_metadata
             )
+
+        for name,dtype in required_metadata:
+            md = SchemaMetaData(name=name, datatype=dtype)
+            self.db.add(md)
+            entry.required_metadata.append(md)
+
+        for section,name,dtype in columns:
+            col = SchemaColumn(section=section, name=name, datatype=dtype)
+            self.db.add(col)
+            entry.columns.append(col)
+
+
         self.db.add(entry)
         self.db.commit()
 
@@ -139,12 +176,16 @@ class Steward(object):
         creator = self.user
         path = self.path_for_dataset(name, version)
         dataset = Dataset(path, schema, "w", size, metadata, comm=self.mpi_comm)
+
+        schema = self.get_schema_info(schema.name,schema.version)
+        print schema
+
         #Only register the dataset after creating it in case something goes wrong.
         if self.is_master:
-            entry = DatasetEntry(name = name,
+            entry = DatasetEntry(
+                name = name,
                 version = version,
-                schema_name = schema.name,
-                schema_version = schema.version,
+                schema = schema,
                 creator = creator,
                 path = path
             )
@@ -172,7 +213,7 @@ class Steward(object):
 
 
     def open_dataset(self, info, schema=None):
-        schema2 = self.get_schema(info.schema_name, info.schema_version)
+        schema2 = self.get_schema(info.schema.name, info.schema.version)
         if schema is not None:
             if schema!=schema2:
                 print schema==schema2
