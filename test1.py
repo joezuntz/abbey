@@ -40,6 +40,8 @@ if args.mpi:
     mpi_rank = comm.Get_rank()
     mpi_size = comm.Get_size()
 else:
+    mpi_rank=0
+    mpi_size=1
     comm = None
 
 
