@@ -25,8 +25,8 @@ class Dataset(object):
             self.parallel = True
 
         self.mode = mode
-        self.path=path
-        self.schema=schema
+        self.path = path
+        self.schema = schema
 
         if mode == "r":
             self.file = h5py.File(path, mode="r", **self.driver_args)
