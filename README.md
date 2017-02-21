@@ -33,8 +33,7 @@ Valet
 The valet provides methods for opening, creating, listing, and deleting 
 Datasets, and syncing them with a remote system.
 
-Valet's implementation calls out to the other objects (Steward, Dataset, 
-Footman).
+Valet's implementation calls out to the other objects described below.
 
 Dataset
 ------
@@ -46,7 +45,7 @@ It provides read and write access to chunks of the data, column and row-wise.
 
 
 Steward
------
+-------
 
 abbey.Steward is responsible for maintaining the database of data sets and schemas, and their paths on disc.  
 All database access goes through the Steward to make it easier to modify cleanly.
@@ -54,3 +53,14 @@ All database access goes through the Steward to make it easier to modify cleanly
 The current implementation uses sqlalchemy and a sqlite database.
 
 
+Librarian
+---------
+
+abbey.Librarian will be in charge of provenance tracking.
+Does not yet exist
+
+Footman
+-------
+
+abbey.Footman will synchronize systems.
+Stub only now.
