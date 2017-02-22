@@ -1,5 +1,6 @@
 from .schema import Schema
 from .dataset import Dataset
+from .errors import *
 import os
 import collections
 import sqlalchemy
@@ -10,15 +11,16 @@ Base = sqlalchemy.ext.declarative.declarative_base()
 
 class DatasetEntry(Base):
     __tablename__ = "datasets"
+    __table_args__ = (sqlalchemy.UniqueConstraint('name', 'version', name='unv_1'),)
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.String)
     version = sqlalchemy.Column(sqlalchemy.Integer)
-    unique_name_version = sqlalchemy.UniqueConstraint('name', 'version', name='unv_1')
     creator = sqlalchemy.Column(sqlalchemy.String)
     path = sqlalchemy.Column(sqlalchemy.String)
 
     schema_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("schemas.id"))
     schema = sqlalchemy.orm.relationship("SchemaEntry", back_populates="datasets")
+
 
 
     def __repr__(self):
@@ -27,10 +29,11 @@ class DatasetEntry(Base):
 
 class SchemaEntry(Base):
     __tablename__ = "schemas"
+    __table_args__ = (sqlalchemy.UniqueConstraint('name', 'version', name='unv_2'),)
+
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.String)
     version = sqlalchemy.Column(sqlalchemy.Integer)
-    unique_name_version = sqlalchemy.UniqueConstraint('name', 'version', name='unv_2')
 
     columns = sqlalchemy.orm.relationship("SchemaColumn")
     required_metadata = sqlalchemy.orm.relationship("SchemaMetaData")
@@ -141,6 +144,9 @@ class Steward(object):
                 sqlalchemy.desc(SchemaEntry.version)).first()
         else:
             entry = self.db.query(SchemaEntry).filter_by(name=name, version=version).first()
+
+        if entry is None:
+            raise NoSuchSchema(name,version)
         return entry
 
     def get_schema(self, name, version=None):
@@ -151,7 +157,6 @@ class Steward(object):
     def create_schema(self, name, version, columns, required_metadata):
         if not self.is_master:
             return
-
         entry = SchemaEntry(
             name = name,
             version = version,
@@ -169,12 +174,19 @@ class Steward(object):
 
 
         self.db.add(entry)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except sqlalchemy.exc.IntegrityError:
+            self.db.rollback()
+            raise SchemaAlreadyExists(name, version)
+            
 
 
     def create_dataset(self, name, version, schema, size, metadata):
         creator = self.user
         path = self.path_for_dataset(name, version)
+        if os.path.exists(path):
+            raise DatasetAlreadyExists(name,version)
         dataset = Dataset(path, schema, "w", size, metadata, comm=self.mpi_comm)
 
         schema = self.get_schema_info(schema.name,schema.version)
@@ -212,7 +224,7 @@ class Steward(object):
 
 
 
-    def get_dataset(self, info, schema=None):
+    def _get_dataset_from_info(self, info, schema=None):
         schema2 = self.get_schema(info.schema.name, info.schema.version)
         if schema is not None:
             if schema!=schema2:
@@ -221,12 +233,12 @@ class Steward(object):
                     schema2, info, schema))
 
         path = self.path_for_dataset(info.name, info.version)
-        dataset = Dataset(path, schema2, "r", open_file=False)
+        dataset = Dataset(path, schema2, "r", open_file=False, name=info.name, version=info.version)
         return dataset
 
 
     def _open_dataset_from_info(self, info, schema=None):
-        dataset = self.get_dataset(info, schema=schema)
+        dataset = self._get_dataset_from_info(info, schema=schema)
         dataset.open()
         return dataset
 
@@ -237,7 +249,9 @@ class Steward(object):
                 sqlalchemy.desc(DatasetEntry.version)).first()
         else:
             entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
-        return self.get_dataset(entry)
+        if entry is None:
+            raise NoSuchDataset(name,version)
+        return self._get_dataset_from_info(entry)
 
     def open_dataset(self, name, version, schema):
         dataset = self.get_dataset_info(name, version)
@@ -264,7 +278,7 @@ class Steward(object):
             entries = entries.filter(SchemaEntry.version==schema_version)
         if schema is not None:
             entries = entries.filter(SchemaEntry.name==schema.name, SchemaEntry.version==schema.version)
-        return [self.get_dataset(entry) for entry in entries]
+        return [self._get_dataset_from_info(entry) for entry in entries]
 
     def list_schema_info(self, name=None, version=None):
         entries = self.db.query(SchemaEntry)
