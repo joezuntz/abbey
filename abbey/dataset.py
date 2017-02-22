@@ -14,7 +14,7 @@ class Dataset(object):
 
     Can validate against a schema. Or is automatically validated.  May have extra columns.
     """
-    def __init__(self, path, schema, mode, size=None, metadata=None, comm=None, open_file=True):
+    def __init__(self, path, schema, mode, size=None, metadata=None, comm=None, open_file=True, name=None, version=None):
         "Size can be a dictionary if there is more than one section in the schema"
         if comm is None:
             self.driver_args = {}
@@ -26,6 +26,9 @@ class Dataset(object):
         self.mode = mode
         self.path = path
         self.schema = schema
+
+        self.name=name
+        self.version=version
 
         if open_file:
             self.open(metadata=metadata,size=size)
