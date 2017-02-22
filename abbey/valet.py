@@ -45,13 +45,7 @@ class Valet(object):
         """
         Open a dataset with the specified name and schema
         """
-        info = self.steward.get_dataset_info(name,version)
-        if info is None:
-            if version is None:
-                raise ValueError('Dataset "{}" not found (any version)'.format(name))
-            else:
-                raise ValueError('Dataset "{}" version {} not found'.format(name, version))
-        dataset = self.steward.open_dataset(info, schema)
+        dataset = self.steward.open_dataset(name, version, schema)
         return dataset
 
     def create_dataset(self, name, version, schema, size, metadata):

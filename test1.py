@@ -8,6 +8,7 @@ def create_test_schema(valet):
         ("shape_cat", "coadd_object_id", "int64"),
         ("shape_cat", "e1", "float64"),
         ("shape_cat", "e2", "float64"),
+        ("shape_cat", "tile", "S12"),
         ("sky_map", "pixel", "int64"),
         ("sky_map", "value", "int64"),
     ]
@@ -15,6 +16,7 @@ def create_test_schema(valet):
     required_metadata = [
         ("magic", "int64"),
         ("cake", "float64"),
+        ("hat_type", "str"),
     ]
 
     schema = valet.create_schema("test_schema", 1, cols, required_metadata)
@@ -29,6 +31,8 @@ parser.add_argument("--read",    help="Read the named dataset")
 parser.add_argument("--missing", action='store_true', help="Make an error by asking for a missing dataset")
 parser.add_argument("--version", type=int, default=1,  help="Version of the data set to create/read")
 parser.add_argument("--list",    action='store_true', help="List data sets")
+parser.add_argument("--list2",    action='store_true', help="List data sets (different version)")
+parser.add_argument("--delete",  help="Delete named dataset v1")
 parser.add_argument("--mpi",    action='store_true', help="Run under MPI")
 args = parser.parse_args()
 
@@ -80,6 +84,12 @@ def example_missing():
 def example_list():
     valet.print_all()
 
+def example_list2():
+    schema = valet.get_schema("test_schema")
+    valet.print_dataset_list(schema=schema)
+
+def example_delete():
+    valet.delete_dataset(args.delete, 1)
 
 if args.create_repo:
     example_create_repo()
@@ -94,5 +104,9 @@ elif args.read:
     example_read_dataset()
 elif args.list:
     example_list()
+elif args.list2:
+    example_list2()
 elif args.missing:
     example_missing()
+elif args.delete:
+    example_delete()

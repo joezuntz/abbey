@@ -203,6 +203,7 @@ class Steward(object):
     def delete_dataset(self, name, version):
         path = self.path_for_dataset(name, version)
         if os.path.exists(path):
+            print "Delete {}".format(path)
             os.remove(path)
         entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
         if entry is None:
@@ -225,9 +226,9 @@ class Steward(object):
         return dataset
 
 
-    def open_dataset(self, info, schema=None):
+    def _open_dataset_from_info(self, info, schema=None):
         dataset = self.get_dataset(info, schema=schema)
-        dataset.open_file()
+        dataset.open()
         return dataset
 
 
@@ -237,7 +238,13 @@ class Steward(object):
                 sqlalchemy.desc(DatasetEntry.version)).first()
         else:
             entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
-        return entry
+        return self._open_dataset_from_info(entry)
+
+    def open_dataset(self, name, version, schema):
+        info = self.get_dataset_info(name, version)
+        return self._open_dataset_from_info(info, schema)
+
+
 
     def list_dataset_info(self, name=None, version=None, schema=None, schema_name=None, schema_version=None,creator=None):
         if schema is not None and (schema_name is not None or schema_version is not None):
@@ -258,7 +265,6 @@ class Steward(object):
         if schema is not None:
             entries = entries.filter(SchemaEntry.name==schema.name, SchemaEntry.version==schema.version)
         return [self.get_dataset(entry) for entry in entries]
-        return list(entries)
 
     def list_schema_info(self, name=None, version=None):
         entries = self.db.query(SchemaEntry)
