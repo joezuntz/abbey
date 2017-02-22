@@ -212,7 +212,7 @@ class Steward(object):
 
 
 
-    def open_dataset(self, info, schema=None):
+    def get_dataset(self, info, schema=None):
         schema2 = self.get_schema(info.schema.name, info.schema.version)
         if schema is not None:
             if schema!=schema2:
@@ -221,7 +221,13 @@ class Steward(object):
                     schema2, info, schema))
 
         path = self.path_for_dataset(info.name, info.version)
-        dataset = Dataset(path, schema, "r")
+        dataset = Dataset(path, schema, "r", open_file=False)
+        return dataset
+
+
+    def open_dataset(self, info, schema=None):
+        dataset = self.get_dataset(info, schema=schema)
+        dataset.open_file()
         return dataset
 
 
@@ -241,14 +247,17 @@ class Steward(object):
             entries = entries.filter_by(name=name)
         if version is not None:
             entries = entries.filter_by(version=version)
-        if schema_name is not None:
-            entries = entries.filter_by(schema_name=schema_name)
-        if schema_version is not None:
-            entries = entries.filter_by(schema_version=schema_version)
         if creator is not None:
             entries = entries.filter_by(creator=creator)
+        if schema_name is not None or schema_version is not None or schema is not None:
+            entries = entries.join(SchemaEntry)
+        if schema_name is not None:
+            entries = entries.filter(SchemaEntry.name==schema_name)
+        if schema_version is not None:
+            entries = entries.filter(SchemaEntry.version==schema_version)
         if schema is not None:
-            entries = entries.filter_by(schema_name=schema.name, schema_version=schema.version)
+            entries = entries.filter(SchemaEntry.name==schema.name, SchemaEntry.version==schema.version)
+        return [self.get_dataset(entry) for entry in entries]
         return list(entries)
 
     def list_schema_info(self, name=None, version=None):
@@ -257,7 +266,7 @@ class Steward(object):
             entries = entries.filter_by(name=name)
         if version is not None:
             entries = entries.filter_by(version=version)
-        return list(entries)
+        return [entry.to_schema() for entry in entries]
 
 
 
