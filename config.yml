@@ -1,4 +1,4 @@
 user: Joe Zuntz
-path: /Users/jaz/src/abbey/repo
+path: ./repo
 db_echo: False
 server: localhost://
