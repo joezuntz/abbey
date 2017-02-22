@@ -16,7 +16,6 @@ class Dataset(object):
     """
     def __init__(self, path, schema, mode, size=None, metadata=None, comm=None, open_file=True):
         "Size can be a dictionary if there is more than one section in the schema"
-        import h5py
         if comm is None:
             self.driver_args = {}
             self.parallel = False
@@ -35,16 +34,17 @@ class Dataset(object):
             self.metadata = None
 
     def open(self, metadata=None, size=None):
+        import h5py
         if self.mode == "r":
             self.file = h5py.File(self.path, mode="r", **self.driver_args)
             self.metadata = self.file['metadata'].attrs
             self.schema.validate_dataset(self)
-        elif mode == "w":
+        elif self.mode == "w":
             if size is None or metadata is None:
                 raise RuntimeError("Must specify metadata to create new dataset")
             self.create_with_schema(self.path, self.schema, size, metadata)
         else:
-            raise ValueError("Unknown dataset mode {}".format(mode))
+            raise ValueError("Unknown dataset mode {}".format(self.mode))
 
 
     def __repr__(self):
