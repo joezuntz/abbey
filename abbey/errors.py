@@ -23,3 +23,5 @@ class SchemaAlreadyExists(AbbeyError):
         message = "Schema called '{}' version {} seems to exist already".format(name,version)
         super(SchemaAlreadyExists, self).__init__(message)
   
+class NoRepository(AbbeyError):
+    pass

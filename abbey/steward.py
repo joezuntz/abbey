@@ -99,9 +99,9 @@ class Steward(object):
         self.user = config.user
         self.path = config.path
         if not os.path.exists(self.db_path):
-            raise ValueError("Repository not found at {} (missing repo.db)".format(self.path))
+            raise NoRepository("Repository not found at {} (missing repo.db)".format(self.path))
         if not os.path.exists(self.data_path):
-            raise ValueError("Repository not found at {} (missing data dir)".format(self.path))
+            raise NoRepository("Repository not found at {} (missing data dir)".format(self.path))
         engine_path = 'sqlite:///' + self.db_path
         self.engine = sqlalchemy.create_engine(engine_path, echo=config.db_echo)
         Base.metadata.create_all(self.engine)

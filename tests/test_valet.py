@@ -108,7 +108,15 @@ def test_valet_double_dataset():
                 valet.create_dataset,"cool_data", 1, schema, 100, example_metadata
             )
 
-
+def test_missing_repo():
+    with temporary_directory() as tmpdir:
+        config = {
+            "user": "Dr Nose",
+            "path": os.path.join(tmpdir, "repo"),
+            "db_echo": False,
+            "server": "localhost://",
+        }
+        assert_raises(NoRepository, Valet, config)
 
 if __name__ == '__main__':
     test_valet_double_schema()
