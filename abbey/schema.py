@@ -39,9 +39,10 @@ class Schema(object):
             if name not in metadata:
                 raise ValidationError("Missing metadata: {}".format(name))
             if dtype=="str":
-                print "String type"
-            value = np.array(metadata[name])
-            dt = value.dtype
+                dt = type(metadata[name]).__name__
+            else:
+                value = np.array(metadata[name])
+                dt = value.dtype
             if not dt==dtype:
                 raise ValidationError("Metadata: {} has wrong type ({} not {})".format(name, dt, dtype))
 
