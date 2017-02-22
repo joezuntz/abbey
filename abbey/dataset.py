@@ -14,7 +14,7 @@ class Dataset(object):
 
     Can validate against a schema. Or is automatically validated.  May have extra columns.
     """
-    def __init__(self, path, schema, mode, size=None, metadata=None, comm=None):
+    def __init__(self, path, schema, mode, size=None, metadata=None, comm=None, open_file=True):
         "Size can be a dictionary if there is more than one section in the schema"
         import h5py
         if comm is None:
@@ -28,16 +28,24 @@ class Dataset(object):
         self.path = path
         self.schema = schema
 
-        if mode == "r":
-            self.file = h5py.File(path, mode="r", **self.driver_args)
+        if open_file:
+            self.open(metadata=metadata,size=size)
+        else:
+            self.file = None
+            self.metadata = None
+
+    def open(self, metadata=None, size=None):
+        if self.mode == "r":
+            self.file = h5py.File(self.path, mode="r", **self.driver_args)
             self.metadata = self.file['metadata'].attrs
-            schema.validate_dataset(self)
+            self.schema.validate_dataset(self)
         elif mode == "w":
             if size is None or metadata is None:
                 raise RuntimeError("Must specify metadata to create new dataset")
-            self.create_with_schema(path, schema, size, metadata)
+            self.create_with_schema(self.path, self.schema, size, metadata)
         else:
             raise ValueError("Unknown dataset mode {}".format(mode))
+
 
     def __repr__(self):
         return '<Dataset of type "{}" v{} mode "{}">'.format(self.schema.name, self.schema.version, self.mode, self.path)
