@@ -1,12 +1,7 @@
 from abbey import Dataset, Schema, Valet
 import os
 import numpy as np
-from test_utils import temporary_directory, schema_ingredients
-
-def create_test_schema():
-    columns, required_metadata, example_metadata = schema_ingredients()
-    schema = Schema("test_schema", 1, columns, required_metadata)
-    return schema, example_metadata
+from test_utils import temporary_directory, schema_ingredients, create_test_schema
 
 
 def test_dataset_keys():

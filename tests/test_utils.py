@@ -38,3 +38,9 @@ def create_test_repo(tmpdir):
     }
     Valet.create_repository(config)
     return Valet(config)
+
+
+def create_test_schema():
+    columns, required_metadata, example_metadata = schema_ingredients()
+    schema = Schema("test_schema", 1, columns, required_metadata)
+    return schema, example_metadata
