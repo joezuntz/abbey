@@ -178,7 +178,6 @@ class Steward(object):
         dataset = Dataset(path, schema, "w", size, metadata, comm=self.mpi_comm)
 
         schema = self.get_schema_info(schema.name,schema.version)
-        print schema
 
         #Only register the dataset after creating it in case something goes wrong.
         if self.is_master:
@@ -222,7 +221,7 @@ class Steward(object):
                     schema2, info, schema))
 
         path = self.path_for_dataset(info.name, info.version)
-        dataset = Dataset(path, schema, "r", open_file=False)
+        dataset = Dataset(path, schema2, "r", open_file=False)
         return dataset
 
 
@@ -238,11 +237,12 @@ class Steward(object):
                 sqlalchemy.desc(DatasetEntry.version)).first()
         else:
             entry = self.db.query(DatasetEntry).filter_by(name=name, version=version).first()
-        return self._open_dataset_from_info(entry)
+        return self.get_dataset(entry)
 
     def open_dataset(self, name, version, schema):
-        info = self.get_dataset_info(name, version)
-        return self._open_dataset_from_info(info, schema)
+        dataset = self.get_dataset_info(name, version)
+        dataset.open()
+        return dataset
 
 
 
