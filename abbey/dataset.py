@@ -46,6 +46,9 @@ class Dataset(object):
             if size is None or metadata is None:
                 raise RuntimeError("Must specify metadata to create new dataset")
             self.create_with_schema(self.path, self.schema, size, metadata)
+        elif self.mode == "rw":
+            self.file = h5py.File(self.path, mode="r+", **self.driver_args)
+            self.metadata = self.file['metadata'].attrs            
         else:
             raise ValueError("Unknown dataset mode {}".format(self.mode))
 
@@ -122,7 +125,7 @@ class Dataset(object):
         return section
 
     def read(self, section_name=None, range=None, columns=None, table_maker=None):
-        if self.mode != "r":
+        if "r" not in self.mode:
             raise RuntimeError("Tried to read data from a file opened in mode: {}".format(self.mode))
 
         if table_maker is None:
@@ -151,8 +154,14 @@ class Dataset(object):
 
 
     def write(self, chunk, section_name=None, range=None, columns=None):
-        if self.mode != "w":
+        if "w" not in self.mode:
             raise RuntimeError("Tried to write data to a file opened in mode: {}".format(self.mode))
+
+        # Enable passing in a single column
+        if isinstance(columns, str):
+            columns = [columns]
+            chunk = [chunk]
+
 
         # chunk must be a list of same length as the number of columns
         # each 
